@@ -1,38 +1,121 @@
 <!DOCTYPE html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Toribio App</title>    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Toribio App | Oficial</title>
+    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
+    <!-- Librerías de React y Iconos (Indispensables) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/lucide-react"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-        body { 
-            background-color: #020617; 
-            margin: 0; 
-            font-family: system-ui, -apple-system, sans-serif;
-            color: white;
-            overflow-x: hidden;
+        :root {
+            --bg-color: #020617;
+            --primary: #4f46e5;
+            --secondary: #1e1b4b;
+            --card-bg: rgba(30, 41, 59, 0.5);
+            --text-main: #ffffff;
+            --text-dim: #94a3b8;
+            --safe-area-inset-bottom: env(safe-area-inset-bottom);
         }
-        #root { min-height: 100vh; }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { 
+            background-color: var(--bg-color); 
+            margin: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: var(--text-main);
+            overflow-x: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Pantalla de Carga Estándar */
         .loading-screen {
             display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;
         }
         .spinner {
-            width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #4f46e5;
+            width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--primary);
             border-radius: 50%; animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Pantalla de Bienvenida */
+        .welcome-screen {
+            position: fixed; inset: 0; background: var(--primary); z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 20px;
+        }
+        .welcome-icon {
+            background: white; color: var(--primary); padding: 25px; border-radius: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2); margin-bottom: 30px;
+        }
+        .welcome-title { font-size: 32px; font-weight: 900; font-style: italic; letter-spacing: -1px; margin: 0; }
+        .welcome-btn {
+            background: white; color: var(--primary); border: none; padding: 18px 50px;
+            border-radius: 20px; font-weight: 800; font-size: 14px; letter-spacing: 2px;
+            margin-top: 40px; cursor: pointer;
+        }
+
+        /* Layout Principal */
+        .app-container { display: flex; flex-direction: column; min-height: 100vh; }
+        
+        .header {
+            padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; items-center;
+            position: sticky; top: 0; background: rgba(2, 6, 23, 0.9); backdrop-filter: blur(10px); z-index: 40;
+        }
+        .logo-box { display: flex; align-items: center; gap: 12px; }
+        .icon-small { background: var(--primary); padding: 8px; border-radius: 12px; display: flex; }
+        .logo-text { font-weight: 900; font-style: italic; font-size: 18px; }
+
+        .main-content { padding: 20px; flex: 1; padding-bottom: 120px; }
+        
+        /* Banner Santiago */
+        .hero-card {
+            background: linear-gradient(135deg, #4f46e5 0%, #312e81 100%);
+            padding: 30px; border-radius: 40px; position: relative; overflow: hidden;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.3); margin-bottom: 25px;
+        }
+        .hero-title { font-size: 24px; font-weight: 900; margin: 0 0 5px 0; font-style: italic; }
+        .hero-sub { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.6); }
+
+        /* Lista de Ligas */
+        .liga-item {
+            background: var(--card-bg); border: 1px solid rgba(255,255,255,0.05);
+            padding: 24px; border-radius: 35px; margin-bottom: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .liga-name { font-weight: 800; font-style: italic; text-transform: uppercase; font-size: 14px; }
+
+        /* Navegación Flotante */
+        .nav-bar {
+            position: fixed; bottom: 25px; left: 20px; right: 20px;
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 40px;
+            display: flex; justify-content: space-around; align-items: center;
+            padding: 18px 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 50;
+        }
+        .nav-icon { opacity: 0.3; }
+        .nav-center {
+            background: var(--primary); padding: 16px; border-radius: 24px;
+            margin-top: -65px; border: 6px solid var(--bg-color);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        }
     </style>
 </head>
 <body>
-    <h1>hola</h1>
     <div id="root">
         <div class="loading-screen">
             <div class="spinner"></div>
@@ -41,7 +124,6 @@
 
     <script type="text/javascript">
         window.addEventListener('load', function() {
-            // USAR LucideReact en lugar de lucide
             const { useState } = React;
             const { ShieldCheck, RefreshCw, Zap, ChevronDown, Download, Calendar, LayoutGrid, Bell, User } = LucideReact;
 
@@ -50,51 +132,48 @@
                 const [loading, setLoading] = useState(false);
 
                 if (showWelcome) {
-                    return React.createElement('div', { 
-                        className: 'fixed inset-0 bg-indigo-600 z-[100] flex flex-col items-center justify-center p-10 text-center',
-                        onClick: () => setShowWelcome(false)
-                    },
-                        React.createElement('div', { className: 'bg-white p-6 rounded-[2.5rem] text-indigo-600 shadow-2xl mb-8' }, 
-                            React.createElement(ShieldCheck, { size: 64 })
-                        ),
-                        React.createElement('h1', { className: 'text-4xl font-black italic mb-2 tracking-tighter' }, 'TORIBIO APP'),
-                        React.createElement('p', { className: 'text-indigo-100 font-bold text-[10px] uppercase tracking-widest mb-12' }, 'Santiago • Modo Realtime'),
-                        React.createElement('button', { className: 'bg-white text-indigo-600 px-14 py-5 rounded-2xl font-black uppercase text-xs' }, 'ENTRAR')
+                    return React.createElement('div', { className: 'welcome-screen', onClick: () => setShowWelcome(false) },
+                        React.createElement('div', { className: 'welcome-icon' }, React.createElement(ShieldCheck, { size: 50 })),
+                        React.createElement('h1', { className: 'welcome-title' }, 'TORIBIO APP'),
+                        React.createElement('p', { style: {opacity: 0.7, fontWeight: 700, fontSize: '10px', letterSpacing: '3px'} }, 'SANTIAGO • CHILE'),
+                        React.createElement('button', { className: 'welcome-btn' }, 'ENTRAR')
                     );
                 }
 
-                return React.createElement('div', { className: 'flex flex-col min-h-screen bg-slate-950' },
-                    React.createElement('header', { className: 'p-5 border-b border-white/5 flex justify-between items-center sticky top-0 bg-slate-950/90 backdrop-blur-xl z-40' },
-                        React.createElement('div', { className: 'flex items-center gap-3' },
-                            React.createElement('div', { className: 'bg-indigo-600 p-2 rounded-xl' }, React.createElement(ShieldCheck, { size: 22 })),
-                            React.createElement('span', { className: 'font-black italic text-xl' }, 'TORIBIO APP')
+                return React.createElement('div', { className: 'app-container' },
+                    React.createElement('header', { className: 'header' },
+                        React.createElement('div', { className: 'logo-box' },
+                            React.createElement('div', { className: 'icon-small' }, React.createElement(ShieldCheck, { size: 20, color: 'white' })),
+                            React.createElement('span', { className: 'logo-text' }, 'TORIBIO APP')
                         ),
                         React.createElement('button', { 
                             onClick: () => { setLoading(true); setTimeout(() => setLoading(false), 1000); },
-                            className: loading ? 'animate-spin opacity-50' : ''
-                        }, React.createElement(RefreshCw, { size: 18 }))
+                            style: { background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '5px' },
+                            className: loading ? 'spinner-icon' : ''
+                        }, React.createElement(RefreshCw, { size: 20, style: loading ? {animation: 'spin 1s linear infinite'} : {} }))
                     ),
-                    React.createElement('main', { className: 'flex-1 p-6 space-y-6 pb-40' },
-                        React.createElement('div', { className: 'bg-indigo-700 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden' },
-                            React.createElement('h2', { className: 'text-2xl font-black italic mb-1 uppercase tracking-tighter' }, 'Santiago'),
-                            React.createElement('p', { className: 'text-[9px] font-black uppercase tracking-widest text-indigo-200' }, 'Conectado'),
-                            React.createElement(Zap, { className: 'absolute -right-8 -bottom-8 text-white/10', size: 160 })
+                    
+                    React.createElement('main', { className: 'main-content' },
+                        React.createElement('div', { className: 'hero-card' },
+                            React.createElement('h2', { className: 'hero-title' }, 'Fútbol En Vivo'),
+                            React.createElement('span', { className: 'hero-sub' }, 'Región Metropolitana'),
+                            React.createElement(Zap, { size: 120, style: {position: 'absolute', right: '-20px', bottom: '-20px', opacity: 0.1} })
                         ),
-                        ['Campeonato Nacional', 'Copa Chile', 'Premier League'].map(liga => 
-                            React.createElement('div', { key: liga, className: 'bg-slate-900/60 p-6 rounded-[2.2rem] border border-white/5 flex justify-between items-center' },
-                                React.createElement('span', { className: 'font-black text-sm uppercase italic' }, liga),
-                                React.createElement(ChevronDown, { size: 18, className: 'text-slate-700' })
+
+                        ['Campeonato Nacional', 'Copa Chile', 'Eliminatorias', 'Champions League'].map(liga => 
+                            React.createElement('div', { key: liga, className: 'liga-item' },
+                                React.createElement('span', { className: 'liga-name' }, liga),
+                                React.createElement(ChevronDown, { size: 18, style: {opacity: 0.2} })
                             )
                         )
                     ),
-                    React.createElement('nav', { className: 'fixed bottom-6 left-6 right-6 bg-slate-900/95 backdrop-blur-2xl border border-white/10 py-5 px-8 rounded-[2.5rem] flex justify-between items-center shadow-2xl' },
-                        React.createElement(Calendar, { size: 22, className: 'opacity-30' }),
-                        React.createElement(LayoutGrid, { size: 22, className: 'opacity-30' }),
-                        React.createElement('div', { className: 'bg-indigo-600 p-4.5 rounded-[1.5rem] -mt-16 border-[6px] border-slate-950 shadow-xl' }, 
-                            React.createElement(Download, { size: 26 })
-                        ),
-                        React.createElement(Bell, { size: 22, className: 'opacity-30' }),
-                        React.createElement(User, { size: 22, className: 'opacity-30' })
+
+                    React.createElement('nav', { className: 'nav-bar' },
+                        React.createElement('div', { className: 'nav-icon' }, React.createElement(Calendar, { size: 22 })),
+                        React.createElement('div', { className: 'nav-icon' }, React.createElement(LayoutGrid, { size: 22 })),
+                        React.createElement('div', { className: 'nav-center' }, React.createElement(Download, { size: 26 })),
+                        React.createElement('div', { className: 'nav-icon' }, React.createElement(Bell, { size: 22 })),
+                        React.createElement('div', { className: 'nav-icon' }, React.createElement(User, { size: 22 }))
                     )
                 );
             }
