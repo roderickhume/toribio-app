@@ -3,262 +3,327 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Toribio Pro | Fútbol en Vivo</title>
+    <title>Toribio Pro | Fútbol Total 360</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
-
-        window.firebase = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, collection };
-    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: #f8fafc; overflow-x: hidden; }
-        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
-        .active-tab { color: #6366f1; position: relative; }
-        .active-tab::after { content: ''; position: absolute; bottom: -8px; width: 4px; height: 4px; background: #6366f1; border-radius: 50%; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            margin: 0; padding: 0;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.06); }
+        .card-shadow { shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
+        .date-divider {
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #6366f1;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .date-divider::after { content: ''; flex: 1; height: 1px; background: rgba(99, 102, 241, 0.2); }
+        
+        /* Animaciones */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
+        
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-slide { animation: slideUp 0.4s ease-out forwards; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useCallback, useMemo } = React;
+
+        const apiKey = ""; // API Key Gemini
+        const appId = "toribio-master-v5";
 
         const App = () => {
-            // Firebase & Auth State
-            const [user, setUser] = useState(null);
-            const [db, setDb] = useState(null);
-            
-            // App State
-            const [view, setView] = useState('inicio'); // inicio, favoritos, tablas, config
-            const [loading, setLoading] = useState(true);
+            const [view, setView] = useState('inicio'); // inicio, favoritos, tablas
             const [data, setData] = useState({ leagues: [] });
-            const [favorites, setFavorites] = useState({ leagues: [], teams: [] });
-            const [weekOffset, setWeekOffset] = useState(0);
+            const [loading, setLoading] = useState(false);
+            const [weekOffset, setWeekOffset] = useState(0); // 0 = hoy, -8 a +8 semanas (2 meses)
+            const [favorites, setFavorites] = useState(() => {
+                const saved = localStorage.getItem('toribio_favs_v5');
+                return saved ? JSON.parse(saved) : { leagues: [] };
+            });
             const [expanded, setExpanded] = useState({});
             const [reminder, setReminder] = useState(null);
 
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'toribio-app-v2';
-            const apiKey = ""; // Inyectado por entorno
-
-            // 1. Inicializar Firebase
+            // Persistencia Local
             useEffect(() => {
-                const config = JSON.parse(__firebase_config);
-                const app = window.firebase.initializeApp(config);
-                const auth = window.firebase.getAuth(app);
-                const firestore = window.firebase.getFirestore(app);
-                setDb(firestore);
+                localStorage.setItem('toribio_favs_v5', JSON.stringify(favorites));
+            }, [favorites]);
 
-                window.firebase.signInAnonymously(auth).catch(console.error);
-                const unsub = window.firebase.onAuthStateChanged(auth, (u) => setUser(u));
-                return () => unsub();
-            }, []);
-
-            // 2. Escuchar Favoritos de Firestore
-            useEffect(() => {
-                if (!user || !db) return;
-                const favDoc = window.firebase.doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'prefs');
-                const unsub = window.firebase.onSnapshot(favDoc, (doc) => {
-                    if (doc.exists()) setFavorites(doc.data());
-                }, (err) => console.error("Error favoritos:", err));
-                return () => unsub();
-            }, [user, db]);
-
-            // 3. IA Fetching (Gemini + Google Search)
-            const fetchData = async (offset) => {
+            const fetchSportsData = useCallback(async (offset) => {
                 setLoading(true);
-                const targetDate = new Date();
-                targetDate.setDate(targetDate.getDate() + (offset * 7));
-                
-                const query = `Resultados y calendario de futbol real para la semana del ${targetDate.toLocaleDateString()} de las ligas: 
-                Chile (Primera y B), Premier League, LaLiga, Serie A, Bundesliga, Champions, Libertadores, MLS, Liga MX y Argentina. 
-                Incluir ranking de los primeros 3 de cada liga.`;
-
                 try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    const today = new Date();
+                    const targetDate = new Date(today);
+                    targetDate.setDate(today.getDate() + (offset * 7));
+                    
+                    const dateRangeStr = targetDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
+                    
+                    // Prompt optimizado para 2 meses atrás y 2 meses adelante
+                    const prompt = `Actúa como API de deportes. Busca partidos REALES de fútbol para la semana que incluye el ${dateRangeStr}.
+                    Debes incluir: Chile (Primera A y B), Premier League, LaLiga, Serie A y Champions League.
+                    1. Si la fecha es PASADA: Muestra resultados finales y marcadores.
+                    2. Si la fecha es FUTURA: Muestra horarios confirmados y fechas de partidos programados.
+                    3. Incluye el Top 3 de la tabla de posiciones de cada liga.
+                    
+                    Responde EXCLUSIVAMENTE con este JSON:
+                    {
+                      "leagues": [
+                        {
+                          "name": "Nombre Liga",
+                          "country": "País",
+                          "ranking": [{"pos": 1, "team": "Equipo", "pts": 10}],
+                          "matches": [
+                            {
+                              "home": "Local",
+                              "away": "Visita",
+                              "score": "2-1 o vacío",
+                              "time": "HH:MM",
+                              "date": "Día DD de Mes",
+                              "status": "FINAL, LIVE o SCHEDULED"
+                            }
+                          ]
+                        }
+                      ]
+                    }`;
+
+                    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            contents: [{ parts: [{ text: query }] }],
-                            systemInstruction: { parts: [{ text: "Responde ÚNICAMENTE un JSON con esta estructura exacta: { 'leagues': [ { 'name': 'Nombre', 'country': 'Pais', 'matches': [ {'home': '', 'away': '', 'score': '', 'time': '', 'status': 'FINAL/LIVE/SCHEDULED'} ], 'ranking': [{'pos':1, 'team':'', 'pts':0}] } ] }. No incluyas texto fuera del JSON." }] },
+                            contents: [{ parts: [{ text: prompt }] }],
                             tools: [{ "google_search": {} }]
                         })
                     });
 
-                    const res = await response.json();
-                    const rawText = res.candidates[0].content.parts[0].text;
-                    const jsonStr = rawText.match(/\{[\s\S]*\}/)[0];
-                    setData(JSON.parse(jsonStr));
+                    const json = await resp.json();
+                    const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    const cleanedJson = rawText.match(/\{[\s\S]*\}/);
+                    if (cleanedJson) {
+                        setData(JSON.parse(cleanedJson[0]));
+                    }
                 } catch (e) {
-                    console.error("Fetch error:", e);
+                    console.error("Error al obtener datos:", e);
                 } finally {
                     setLoading(false);
                 }
+            }, []);
+
+            useEffect(() => {
+                fetchSportsData(weekOffset);
+            }, [weekOffset, fetchSportsData]);
+
+            const toggleFavorite = (name) => {
+                setFavorites(prev => ({
+                    leagues: prev.leagues.includes(name) 
+                        ? prev.leagues.filter(l => l !== name) 
+                        : [...prev.leagues, name]
+                }));
             };
 
-            useEffect(() => { fetchData(weekOffset); }, [weekOffset]);
-
-            // 4. Acciones
-            const toggleFav = async (name) => {
-                if (!user || !db) return;
-                const newFavs = { ...favorites };
-                if (newFavs.leagues.includes(name)) {
-                    newFavs.leagues = newFavs.leagues.filter(l => l !== name);
-                } else {
-                    newFavs.leagues.push(name);
-                }
-                const docRef = window.firebase.doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'prefs');
-                await window.firebase.setDoc(docRef, newFavs);
-            };
-
-            const toggleExpand = (name) => setExpanded(p => ({...p, [name]: !p[name]}));
-
-            // Componentes UI
-            const MatchCard = ({ m }) => (
-                <div className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between mb-2">
-                    <div className="flex-1 text-right text-xs font-bold truncate pr-2">{m.home}</div>
-                    <div className="flex flex-col items-center min-w-[70px]">
-                        <div className={`px-2 py-1 rounded-lg text-[10px] font-black ${m.status === 'LIVE' ? 'bg-red-500 animate-pulse' : 'bg-indigo-600'}`}>
-                            {m.score || m.time}
-                        </div>
-                        <button onClick={() => setReminder(m.home + ' vs ' + m.away)} className="text-[8px] text-slate-500 mt-1 uppercase font-bold">
-                            <i className="fa-solid fa-bell mr-1"></i> Recordar
-                        </button>
-                    </div>
-                    <div className="flex-1 text-left text-xs font-bold truncate pl-2">{m.away}</div>
-                </div>
+            const filteredLeagues = data.leagues.filter(l => 
+                view === 'favoritos' ? favorites.leagues.includes(l.name) : true
             );
 
-            const filteredLeagues = data.leagues.filter(l => view === 'favoritos' ? favorites.leagues.includes(l.name) : true);
-
             return (
-                <div className="max-w-md mx-auto min-h-screen flex flex-col pb-24">
-                    {/* Header */}
-                    <header className="p-6 sticky top-0 z-40 bg-[#020617]/80 backdrop-blur-xl flex justify-between items-center border-b border-white/5">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center rotate-6">
-                                <i className="fa-solid fa-bolt text-white text-sm"></i>
+                <div className="flex flex-col min-h-screen max-w-md mx-auto bg-[#020617] text-slate-100">
+                    {/* Top Bar */}
+                    <header className="sticky top-0 z-50 p-5 glass border-b border-white/5 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30 rotate-3">
+                                <i className="fa-solid fa-futbol text-white"></i>
                             </div>
-                            <h1 className="text-xl font-black italic tracking-tighter">TORIBIO<span className="text-indigo-500">PRO</span></h1>
+                            <div>
+                                <h1 className="text-lg font-black italic tracking-tighter uppercase leading-none">Toribio<span className="text-indigo-500 font-extrabold">PRO</span></h1>
+                                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Estadísticas en tiempo real</p>
+                            </div>
                         </div>
-                        <div className="flex gap-4 text-slate-400">
-                            <i className="fa-solid fa-magnifying-glass"></i>
-                            <i className="fa-solid fa-user-ninja"></i>
+                        <div className="flex gap-4">
+                            <button className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-400"><i className="fa-solid fa-magnifying-glass text-xs"></i></button>
+                            <div className={`w-2 h-2 rounded-full mt-3 ${loading ? 'bg-indigo-500 animate-ping' : 'bg-emerald-500'}`}></div>
                         </div>
                     </header>
 
-                    <main className="px-4 pt-4 flex-1">
-                        {/* Selector de Fecha */}
-                        <div className="glass rounded-3xl p-2 flex justify-between items-center mb-6">
-                            <button onClick={() => setWeekOffset(w => w - 1)} className="p-3 text-slate-400 hover:text-white"><i className="fa-solid fa-chevron-left"></i></button>
-                            <div className="text-center">
-                                <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest leading-none mb-1">Calendario</p>
-                                <p className="text-xs font-bold">{weekOffset === 0 ? "Esta Semana" : (weekOffset > 0 ? `Semanas +${weekOffset}` : `Semanas ${weekOffset}`)}</p>
+                    <main className="flex-1 p-4 pb-28">
+                        {/* Control de Tiempo (Navegación +/- 2 meses) */}
+                        <div className="flex items-center justify-between glass p-2 rounded-2xl mb-8 border border-white/10">
+                            <button 
+                                onClick={() => setWeekOffset(v => Math.max(-8, v - 1))} 
+                                className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 active:scale-95 transition-transform"
+                            >
+                                <i className="fa-solid fa-chevron-left"></i>
+                            </button>
+                            
+                            <div className="text-center px-4">
+                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-[2px] block mb-0.5">Línea de Tiempo</span>
+                                <span className="text-xs font-extrabold flex items-center gap-2">
+                                    <i className="fa-regular fa-calendar-check opacity-50"></i>
+                                    {weekOffset === 0 ? "ESTA SEMANA" : (weekOffset > 0 ? `+${weekOffset} SEMANAS` : `${weekOffset} SEMANAS`)}
+                                </span>
                             </div>
-                            <button onClick={() => setWeekOffset(w => w + 1)} className="p-3 text-slate-400 hover:text-white"><i className="fa-solid fa-chevron-right"></i></button>
+
+                            <button 
+                                onClick={() => setWeekOffset(v => Math.min(8, v + 1))} 
+                                className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 active:scale-95 transition-transform"
+                            >
+                                <i className="fa-solid fa-chevron-right"></i>
+                            </button>
                         </div>
 
-                        {loading ? (
-                            <div className="flex flex-col items-center justify-center py-20 opacity-50">
-                                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest">Buscando datos globales...</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {filteredLeagues.length === 0 && view === 'favoritos' && (
-                                    <div className="text-center py-10 text-slate-500 text-sm italic">No tienes ligas favoritas marcadas.</div>
-                                )}
-                                {filteredLeagues.map(league => (
-                                    <div key={league.name} className="glass rounded-[28px] overflow-hidden animate-slide">
-                                        <div onClick={() => toggleExpand(league.name)} className="p-5 flex justify-between items-center">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-white/5 rounded-2xl flex items-center justify-center text-indigo-400 text-lg">
-                                                    <i className="fa-solid fa-globe"></i>
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-xs font-black uppercase italic tracking-tight">{league.name}</h3>
-                                                    <p className="text-[9px] text-slate-500 font-bold uppercase">{league.country}</p>
-                                                </div>
+                        {/* Listado de Ligas */}
+                        <div className="space-y-5">
+                            {loading && (
+                                <div className="space-y-4 py-4">
+                                    {[1,2,3].map(i => <div key={i} className="h-20 w-full bg-slate-900/50 rounded-3xl animate-pulse"></div>)}
+                                </div>
+                            )}
+
+                            {!loading && filteredLeagues.length === 0 && (
+                                <div className="text-center py-20 bg-slate-900/20 rounded-[40px] border border-dashed border-white/5">
+                                    <i className="fa-solid fa-ghost text-4xl text-slate-800 mb-4"></i>
+                                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Sin datos disponibles para este periodo</p>
+                                </div>
+                            )}
+
+                            {!loading && filteredLeagues.map(league => (
+                                <div key={league.name} className="glass rounded-[32px] overflow-hidden border border-white/5 card-shadow animate-in">
+                                    <div 
+                                        className="p-5 flex justify-between items-center cursor-pointer active:bg-white/5 transition-colors"
+                                        onClick={() => setExpanded(p => ({...p, [league.name]: !p[league.name]}))}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center text-indigo-400 border border-white/5">
+                                                <i className="fa-solid fa-trophy"></i>
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                <button onClick={(e) => { e.stopPropagation(); toggleFav(league.name); }} className="text-lg">
-                                                    <i className={`fa-star ${favorites.leagues.includes(league.name) ? 'fa-solid text-yellow-400' : 'fa-regular text-slate-600'}`}></i>
-                                                </button>
-                                                <i className={`fa-solid fa-chevron-${expanded[league.name] ? 'down' : 'right'} text-slate-600 text-xs`}></i>
+                                            <div>
+                                                <h3 className="text-[11px] font-black uppercase italic tracking-tight leading-none">{league.name}</h3>
+                                                <p className="text-[9px] text-slate-500 font-bold uppercase mt-1.5 flex items-center gap-1.5">
+                                                    <i className="fa-solid fa-earth-americas text-[8px]"></i> {league.country}
+                                                </p>
                                             </div>
                                         </div>
-
-                                        {expanded[league.name] && (
-                                            <div className="px-5 pb-5">
-                                                {view === 'tablas' ? (
-                                                    <div className="bg-white/5 rounded-2xl p-4">
-                                                        <p className="text-[10px] font-black text-slate-500 mb-3 uppercase tracking-widest">Ranking Top 3</p>
-                                                        {league.ranking?.map(r => (
-                                                            <div key={r.pos} className="flex justify-between text-xs py-2 border-b border-white/5 last:border-0">
-                                                                <span className="font-bold">{r.pos}. {r.team}</span>
-                                                                <span className="text-indigo-400 font-black">{r.pts} PTS</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    league.matches.map((m, i) => <MatchCard key={i} m={m} />)
-                                                )}
-                                            </div>
-                                        )}
+                                        <div className="flex items-center gap-4">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); toggleFavorite(league.name); }}
+                                                className={`w-9 h-9 rounded-xl transition-all flex items-center justify-center ${favorites.leagues.includes(league.name) ? 'bg-yellow-400/10 text-yellow-400' : 'text-slate-700 hover:text-slate-400'}`}
+                                            >
+                                                <i className={`fa-star ${favorites.leagues.includes(league.name) ? 'fa-solid' : 'fa-regular'}`}></i>
+                                            </button>
+                                            <i className={`fa-solid fa-chevron-${expanded[league.name] ? 'down' : 'right'} text-[10px] text-slate-600`}></i>
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
+
+                                    {expanded[league.name] && (
+                                        <div className="px-5 pb-5 space-y-4 animate-in">
+                                            {/* Rankings en Vista Tablas */}
+                                            {view === 'tablas' && (
+                                                <div className="bg-slate-950/50 rounded-2xl p-4 border border-white/5">
+                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                        <i className="fa-solid fa-list-ol"></i> Top Posiciones
+                                                    </p>
+                                                    {league.ranking?.map(r => (
+                                                        <div key={r.pos} className="flex justify-between items-center py-2.5 border-b border-white/5 last:border-0">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-[10px] font-black text-slate-600 w-4">{r.pos}</span>
+                                                                <span className="text-xs font-bold text-slate-300">{r.team}</span>
+                                                            </div>
+                                                            <span className="text-xs font-black text-indigo-400">{r.pts} <span className="text-[8px] text-slate-500 font-bold ml-0.5">PTS</span></span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Partidos en Vista Inicio/Favoritos */}
+                                            {view !== 'tablas' && league.matches.map((m, idx) => (
+                                                <div key={idx} className="flex flex-col">
+                                                    <div className="date-divider">{m.date}</div>
+                                                    <div className="bg-slate-900/40 border border-white/5 p-4 rounded-2xl flex items-center justify-between group">
+                                                        <div className="flex-1 text-right text-[11px] font-bold text-slate-300 truncate pr-2">{m.home}</div>
+                                                        
+                                                        <div className="flex flex-col items-center min-w-[85px]">
+                                                            <div className={`px-3 py-1 rounded-lg text-[10px] font-black shadow-lg shadow-black/20 ${m.status === 'LIVE' ? 'bg-red-500 animate-pulse text-white' : (m.status === 'FINAL' ? 'bg-slate-800 text-slate-400' : 'bg-indigo-600 text-white')}`}>
+                                                                {m.status === 'SCHEDULED' ? m.time : (m.score || m.time)}
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => setReminder(`${m.home} vs ${m.away}`)}
+                                                                className="text-[8px] text-slate-500 mt-2 uppercase font-black tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <i className="fa-solid fa-bell mr-1"></i> Recordar
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="flex-1 text-left text-[11px] font-bold text-slate-300 truncate pl-2">{m.away}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </main>
 
-                    {/* Modal Estilo Gmail */}
+                    {/* Modal Recordatorios Gmail Style */}
                     {reminder && (
-                        <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 animate-in fade-in duration-300">
-                            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setReminder(null)}></div>
-                            <div className="bg-[#0f172a] w-full rounded-[40px] p-8 relative border border-white/10 animate-slide">
+                        <div className="fixed inset-0 z-[100] flex items-end justify-center p-4">
+                            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setReminder(null)}></div>
+                            <div className="bg-[#0f172a] w-full rounded-[40px] p-8 relative border border-white/10 animate-in">
                                 <div className="w-12 h-1 bg-slate-800 rounded-full mx-auto mb-8"></div>
                                 <div className="flex items-center gap-4 mb-8">
-                                    <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-500 text-xl"><i className="fa-solid fa-bell"></i></div>
+                                    <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-500 text-xl">
+                                        <i className="fa-solid fa-bell-concierge"></i>
+                                    </div>
                                     <div>
-                                        <h4 className="font-black italic uppercase leading-none">{reminder}</h4>
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Configurar Recordatorio</p>
+                                        <h4 className="text-sm font-black italic uppercase leading-none">{reminder}</h4>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">¿Cuándo te avisamos?</p>
                                     </div>
                                 </div>
                                 <div className="space-y-3">
-                                    {["10 min antes", "1 hora antes", "Al empezar", "Recordar mañana"].map(opt => (
-                                        <button key={opt} onClick={() => setReminder(null)} className="w-full p-5 bg-white/5 rounded-2xl text-left font-bold text-sm flex justify-between items-center hover:bg-indigo-600 transition-colors">
-                                            {opt} <i className="fa-solid fa-clock-rotate-left opacity-30"></i>
+                                    {["15 minutos antes", "1 hora antes", "Al inicio", "Un día antes"].map(opt => (
+                                        <button key={opt} onClick={() => setReminder(null)} className="w-full p-5 bg-white/5 rounded-3xl text-left font-bold text-sm flex justify-between items-center hover:bg-indigo-600 transition-colors group">
+                                            {opt} <i className="fa-solid fa-chevron-right opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
                                         </button>
                                     ))}
                                 </div>
+                                <button onClick={() => setReminder(null)} className="w-full mt-6 py-4 text-[10px] font-black text-slate-600 uppercase tracking-[3px]">Cerrar</button>
                             </div>
                         </div>
                     )}
 
-                    {/* Footer Nav */}
-                    <nav className="fixed bottom-0 inset-x-0 glass border-t border-white/5 p-4 flex justify-around items-center z-40">
-                        <NavBtn icon="fa-house" label="Inicio" active={view === 'inicio'} onClick={() => setView('inicio')} />
+                    {/* Botonera de Navegación */}
+                    <nav className="fixed bottom-0 inset-x-0 glass border-t border-white/10 p-5 flex justify-around items-center z-[60] pb-8">
+                        <NavBtn icon="fa-house" label="Partidos" active={view === 'inicio'} onClick={() => setView('inicio')} />
                         <NavBtn icon="fa-star" label="Favoritos" active={view === 'favoritos'} onClick={() => setView('favoritos')} />
-                        <NavBtn icon="fa-chart-line" label="Tablas" active={view === 'tablas'} onClick={() => setView('tablas')} />
-                        <NavBtn icon="fa-gear" label="Config" active={view === 'config'} onClick={() => setView('config')} />
+                        <NavBtn icon="fa-ranking-star" label="Rankings" active={view === 'tablas'} onClick={() => setView('tablas')} />
+                        <NavBtn icon="fa-gear" label="Config" active={view === 'config'} onClick={() => {}} />
                     </nav>
                 </div>
             );
         };
 
         const NavBtn = ({ icon, label, active, onClick }) => (
-            <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all ${active ? 'active-tab' : 'text-slate-600'}`}>
+            <button onClick={onClick} className={`flex flex-col items-center gap-1.5 transition-all relative ${active ? 'text-indigo-500 scale-110' : 'text-slate-600'}`}>
                 <i className={`fa-solid ${icon} text-lg`}></i>
-                <span className="text-[8px] font-black uppercase tracking-tighter">{label}</span>
+                <span className="text-[9px] font-black uppercase tracking-tighter">{label}</span>
+                {active && <div className="absolute -bottom-2 w-1 h-1 bg-indigo-500 rounded-full"></div>}
             </button>
         );
 
