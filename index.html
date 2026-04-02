@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Toribio App | Fútbol Chileno</title>
+    <title>Toribio App | Fútbol Total</title>
     
     <style>
         :root {
@@ -54,18 +54,17 @@
 
         .section-title {
             font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px;
-            color: var(--text-dim); margin: 20px 0 15px 0; display: block; font-weight: 900;
+            color: var(--text-dim); margin: 25px 0 15px 0; display: block; font-weight: 900;
         }
 
         .match-card {
             background: rgba(30, 41, 59, 0.5);
             border: 1px solid rgba(255,255,255,0.05);
-            padding: 20px; border-radius: 25px; margin-bottom: 12px;
+            padding: 20px; border-radius: 25px; margin-bottom: 15px;
         }
 
-        .match-data { font-size: 0.9rem; line-height: 1.6; }
-        .match-data b { color: var(--accent); }
-
+        .match-data { font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; }
+        
         .loading-overlay {
             position: fixed; inset: 0; background: rgba(2,6,23,0.8);
             display: none; flex-direction: column; align-items: center;
@@ -88,15 +87,13 @@
 
         .nav-link { color: var(--text-dim); text-decoration: none; font-size: 0.6rem; font-weight: 900; }
         .nav-link.active { color: var(--primary); }
-
-        .source-link { font-size: 0.6rem; color: var(--text-dim); margin-top: 10px; display: block; text-decoration: none; }
     </style>
 </head>
 <body>
 
     <div id="loader" class="loading-overlay">
         <div class="spinner"></div>
-        <p style="margin-top: 15px; font-weight: 800; font-size: 0.7rem; letter-spacing: 2px;">BUSCANDO GOLES...</p>
+        <p style="margin-top: 15px; font-weight: 800; font-size: 0.7rem; letter-spacing: 2px;">ACTUALIZANDO MARCADORES...</p>
     </div>
 
     <header>
@@ -106,70 +103,84 @@
 
     <main>
         <div class="hero">
-            <h1>Santiago, Chile</h1>
+            <h1 id="city-title">SANTIAGO, CHILE</h1>
             <p id="current-date" style="font-size: 0.7rem; opacity: 0.7; margin: 5px 0 15px 0;"></p>
-            <button class="btn-update" onclick="updateFootballData()">Actualizar Resultados</button>
+            <button class="btn-update" onclick="updateFootballData()">Actualizar Marcadores</button>
         </div>
 
-        <span class="section-title">Resultados Campeonato Nacional</span>
-        <div id="results-container">
-            <div class="match-card" style="text-align: center; color: var(--text-dim);">
-                Pulsa el botón de arriba para ver los últimos resultados reales del fútbol chileno.
+        <div id="results-sections">
+            <div id="chile-results">
+                <span class="section-title">Chile: Campeonato Nacional</span>
+                <div class="match-card" style="text-align: center; color: var(--text-dim);">
+                    Cargando última fecha...
+                </div>
+            </div>
+
+            <div id="europe-results">
+                <span class="section-title">Europa: Ligas Principales</span>
+                <div class="match-card" style="text-align: center; color: var(--text-dim);">
+                    Cargando Champions/Ligas...
+                </div>
             </div>
         </div>
     </main>
 
     <nav>
         <a href="#" class="nav-link active">INICIO</a>
+        <a href="#" class="nav-link">LIGAS</a>
         <a href="#" class="nav-link">TABLA</a>
-        <a href="#" class="nav-link">CALENDARIO</a>
     </nav>
 
     <script>
-        const apiKey = ""; // La API key se inyecta automáticamente en el entorno de ejecución
+        const apiKey = ""; // La API key se inyecta automáticamente
 
-        async function updateFootballData() {
-            const loader = document.getElementById('loader');
-            const container = document.getElementById('results-container');
-            loader.style.display = 'flex';
-
-            const userQuery = "resultados fecha actual campeonato nacional chile futbol hoy";
-            const systemPrompt = "Eres un experto en deportes. Extrae los resultados de los partidos jugados hoy o en la última fecha del Campeonato Nacional de Chile. Presenta los datos de forma limpia: Equipo Local vs Equipo Visitante y el Marcador. Sé breve.";
+        async function getGroundingData(query, targetId) {
+            const container = document.getElementById(targetId);
+            const systemPrompt = "Eres un analista deportivo. Busca resultados REALES de la fecha actual. Formato: 'Equipo A [Marcador] Equipo B'. Si no hay partidos hoy, muestra los de ayer. Sé breve y directo.";
 
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: userQuery }] }],
+                        contents: [{ parts: [{ text: query }] }],
                         systemInstruction: { parts: [{ text: systemPrompt }] },
                         tools: [{ "google_search": {} }]
                     })
                 });
 
                 const result = await response.json();
-                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "No se encontraron resultados recientes.";
-                const sources = result.candidates?.[0]?.groundingMetadata?.groundingAttributions?.map(a => ({ uri: a.web?.uri, title: a.web?.title })) || [];
-
-                // Formatear el texto para que se vea como cards
-                const formattedText = text.replace(/\n/g, '<br>');
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "No se encontraron datos.";
                 
                 container.innerHTML = `
                     <div class="match-card">
-                        <div class="match-data">${formattedText}</div>
-                        ${sources.length > 0 ? `<a href="${sources[0].uri}" target="_blank" class="source-link">Fuente: ${sources[0].title}</a>` : ''}
+                        <div class="match-data">${text}</div>
                     </div>
                 `;
 
             } catch (error) {
-                console.error(error);
-                container.innerHTML = '<div class="match-card" style="color: #ef4444;">Error al conectar con el servidor de búsqueda. Inténtalo de nuevo.</div>';
-            } finally {
-                loader.style.display = 'none';
+                container.innerHTML = '<div class="match-card" style="color: #ef4444;">Error al cargar.</div>';
             }
         }
 
-        document.getElementById('current-date').innerText = new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+        async function updateFootballData() {
+            const loader = document.getElementById('loader');
+            loader.style.display = 'flex';
+
+            // Ejecutamos ambas búsquedas en paralelo
+            await Promise.all([
+                getGroundingData("resultados ultima fecha campeonato nacional chile hoy ayer 2026", "chile-results"),
+                getGroundingData("resultados hoy champions league premier league laliga europa", "europe-results")
+            ]);
+
+            loader.style.display = 'none';
+        }
+
+        // Carga inicial al abrir
+        window.onload = () => {
+            document.getElementById('current-date').innerText = new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+            updateFootballData();
+        };
     </script>
 
 </body>
