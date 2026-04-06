@@ -1,14 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/gemini", "destination": "/api/gemini.js" }
-  ],
-  "headers": [
-    {
-      "source": "/api/gemini",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" }
-      ]
-    }
+    { "source": "/api/groq", "destination": "/api/groq.js" }
   ]
 }
