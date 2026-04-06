@@ -36,6 +36,13 @@ const [error, setError] = useState("");
 const [showStats, setShowStats] = useState(false);
 const [statsData, setStatsData] = useState(null);
 const [statsLoading, setStatsLoading] = useState(false);
+
+const safeSplit = (score) => {
+  if (!score || typeof score !== "string") return ["-", "-"];
+  const parts = score.split("-");
+  return [parts[0] || "-", parts[1] || "-"];
+};
+
 const toggleFavorite = (matchId) => {
 setFavorites(prev => {
 const isFav = prev.includes(matchId);
@@ -44,17 +51,20 @@ setTimeout(() => setToast(""), 2000);
 return isFav ? prev.filter(id => id !== matchId) : [...prev, matchId];
 });
 };
+
 const fetchData = async (tab) => {
 setLoading(true);
 setError("");
 let prompt = "";
 if (tab === "anteriores") {
-prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los últimos 7 días (desde hace 7 días hasta ayer). Categorizar obligatoriamente por división: Primera División, Segunda División y Tercera División. Formato exacto: {"leagues": [{"name": "Primera División", "matches": [...]}, {"name": "Segunda División", "matches": [...]}, {"name": "Tercera División", "matches": [...]}]}. Si no hay partidos en una división poner array vacío [].`;
+prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los últimos 7 días (desde hace 7 días hasta ayer). Categorizar obligatoriamente por división: Primera División, Segunda División y Tercera División.`;
 } else if (tab === "siguientes") {
-prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los próximos 7 días (desde mañana hasta dentro de 7 días). Categorizar obligatoriamente por división: Primera División, Segunda División y Tercera División. Formato exacto: {"leagues": [{"name": "Primera División", "matches": [...]}, {"name": "Segunda División", "matches": [...]}, {"name": "Tercera División", "matches": [...]}]}. Si no hay partidos en una división poner array vacío [].`;
+prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los próximos 7 días (desde mañana hasta dentro de 7 días). Categorizar obligatoriamente por división: Primera División, Segunda División y Tercera División.`;
 } else {
-prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de HOY (fecha actual). Incluir también los partidos que están en vivo. Categorizar obligatoriamente por división: Primera División, Segunda División y Tercera División. Formato exacto: {"leagues": [{"name": "Primera División", "matches": [...]}, {"name": "Segunda División", "matches": [...]}, {"name": "Tercera División", "matches": [...]}]}. Si no hay partidos responder {"leagues": []}`;
+prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de HOY (fecha actual). Incluir también los partidos que están en vivo. Categorizar obligatoriamente por división: Primera División, Segunda División y Tercera División.`;
 }
+prompt += ` Formato exacto: {"leagues": [{"name": "Primera División", "matches": [{"id": number, "home": "String", "away": "String", "score": "0-0", "time": "15:00", "date": "String", "status": "LIVE|FINAL|SCHEDULED", "location": "String", "city": "String"}]}, ... ]}. Si no hay partidos en una división poner array vacío [].`;
+
 try {
 const response = await fetch('/api/gemini', {
 method: 'POST',
@@ -79,9 +89,10 @@ setError("Error al obtener datos en tiempo real.");
 setData({leagues:[]});
 } finally { setLoading(false); }
 };
+
 const fetchStats = async () => {
 setStatsLoading(true);
-const prompt = `JSON ONLY. Estadísticas actuales y ranking de equipos chilenos de fútbol profesional. Incluir Primera División, Segunda División y Tercera División. Formato exacto: {"leagues": [{"name": "Primera División", "standings": [{"position": number, "team": "String", "points": number, "played": number, "wins": number, "draws": number, "losses": number, "goalsFor": number, "goalsAgainst": number}]}, {"name": "Segunda División", "standings": [...]}, {"name": "Tercera División", "standings": [...]}]}`;
+const prompt = `JSON ONLY. Estadísticas actuales y ranking de equipos chilenos de fútbol profesional. Incluir Primera División, Segunda División y Tercera División. Formato exacto: {"leagues": [{"name": "Primera División", "standings": [{"position": number, "team": "String", "points": number, "played": number, "wins": number, "draws": number, "losses": number, "goalsFor": number, "goalsAgainst": number}]}, ... ]}`;
 try {
 const response = await fetch('/api/gemini', {
 method: 'POST',
@@ -102,14 +113,18 @@ else setStatsData({leagues:[]});
 setStatsData({leagues:[]});
 } finally { setStatsLoading(false); }
 };
+
 const openStats = () => {
 setShowStats(true);
 if (!statsData) fetchStats();
 };
+
 const resetToToday = () => {
 setSelectedTab("hoy");
 };
+
 useEffect(() => { fetchData(selectedTab); }, [selectedTab]);
+
 return (
 <div className="flex flex-col min-h-screen max-w-md mx-auto bg-[#020617] pb-32">
 <header className="p-5 flex justify-between items-center sticky top-0 z-50 glass border-b border-white/10">
@@ -122,6 +137,7 @@ return (
 </div>
 <button onClick={() => fetchData(selectedTab)} className={`p-2 rounded-full ${loading ? 'animate-spin text-indigo-400' : 'text-slate-400 active:bg-white/10'}`}><i className="fa-solid fa-rotate-right"></i></button>
 </header>
+
 <div className="p-4">
 <div className="bg-slate-900/80 rounded-2xl flex items-center justify-around p-2 border border-white/5">
 <button onClick={() => setSelectedTab("anteriores")} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTab === "anteriores" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 active:bg-white/10'}`}>Anteriores</button>
@@ -129,6 +145,7 @@ return (
 <button onClick={() => setSelectedTab("siguientes")} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTab === "siguientes" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 active:bg-white/10'}`}>Siguientes</button>
 </div>
 </div>
+
 <main className="px-4 space-y-8">
 {loading ? [1,2,3].map(i => (
 <div key={i} className="space-y-3">
@@ -146,7 +163,9 @@ return (
 <div className="w-5 h-5 bg-indigo-600 rounded flex items-center justify-center text-[10px]"><i className="fa-solid fa-trophy"></i></div>
 {league.name}
 </h2>
-{league.matches && league.matches.length > 0 ? league.matches.map((match, midx) => (
+{league.matches && league.matches.length > 0 ? league.matches.map((match, midx) => {
+const [homeScore, awayScore] = safeSplit(match.score);
+return (
 <div key={midx} className="match-card glass rounded-[28px] p-5 relative overflow-hidden group">
 {match.status === 'LIVE' && <div className="absolute top-0 right-0 px-3 py-1 bg-red-600 text-[8px] font-black text-white rounded-bl-xl animate-pulse z-10">VIVO</div>}
 <div className="flex justify-between items-center mb-4">
@@ -157,8 +176,8 @@ return (
 </div>
 <div className="flex items-center justify-between gap-4" onClick={() => setSelectedMatch({...match, leagueName: league.name})}>
 <div className="flex-1 space-y-3">
-<div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-100">{match.home}</span><span className="text-sm font-black text-white">{match.status === 'SCHEDULED' ? '-' : match.score.split('-')[0]}</span></div>
-<div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-100">{match.away}</span><span className="text-sm font-black text-white">{match.status === 'SCHEDULED' ? '-' : match.score.split('-')[1]}</span></div>
+<div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-100">{match.home}</span><span className="text-sm font-black text-white">{homeScore}</span></div>
+<div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-100">{match.away}</span><span className="text-sm font-black text-white">{awayScore}</span></div>
 </div>
 <div className="w-[1px] h-10 bg-white/10"></div>
 <div className="text-center min-w-[60px]">
@@ -168,7 +187,8 @@ return (
 </div>
 </div>
 </div>
-)) : (
+);
+}) : (
 <div className="glass rounded-[28px] p-8 text-center">
 <p className="text-slate-400 text-sm">No hay partidos programados en esta división para el período seleccionado.</p>
 </div>
@@ -181,6 +201,7 @@ return (
 </div>
 )}
 </main>
+
 <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-sm h-16 glass rounded-[32px] flex justify-around items-center px-4 border border-white/10 shadow-2xl z-[100]">
 <i onClick={resetToToday} className="fa-solid fa-house-chimney text-lg text-indigo-500 cursor-pointer"></i>
 <i onClick={openStats} className="fa-solid fa-chart-simple text-lg text-slate-500 cursor-pointer"></i>
@@ -188,6 +209,8 @@ return (
 <div className="relative"><i className="fa-solid fa-star text-lg text-slate-500"></i>{favorites.length > 0 && <span className="absolute -top-1 -right-1.5 w-4 h-4 bg-amber-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">{favorites.length}</span>}</div>
 <i className="fa-solid fa-gear text-lg text-slate-500"></i>
 </nav>
+
+{/* Modal Partido */}
 {selectedMatch && (
 <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6 z-[200] modal-enter-active" onClick={() => setSelectedMatch(null)}>
 <div className="bg-[#0f172a] rounded-[32px] w-full max-w-sm p-8 border border-white/10 shadow-2xl relative" onClick={e => e.stopPropagation()}>
@@ -195,13 +218,11 @@ return (
 <div className="text-center mb-8">
 <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl"><i className="fa-solid fa-shield-halved"></i></div>
 <h3 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-1">{selectedMatch.leagueName}</h3>
-<p className="text-xs font-bold text-slate-400">
-{selectedMatch.date} • {selectedMatch.time}
-</p>
+<p className="text-xs font-bold text-slate-400">{selectedMatch.date} • {selectedMatch.time}</p>
 </div>
 <div className="space-y-6">
-<div className="flex justify-between items-center text-sm font-bold text-white"><span>{selectedMatch.home}</span><span className="font-black text-lg text-indigo-400">{selectedMatch.status === 'SCHEDULED' ? '-' : selectedMatch.score.split('-')[0]}</span></div>
-<div className="flex justify-between items-center text-sm font-bold text-white"><span>{selectedMatch.away}</span><span className="font-black text-lg text-indigo-400">{selectedMatch.status === 'SCHEDULED' ? '-' : selectedMatch.score.split('-')[1]}</span></div>
+<div className="flex justify-between items-center text-sm font-bold text-white"><span>{selectedMatch.home}</span><span className="font-black text-lg text-indigo-400">{safeSplit(selectedMatch.score)[0]}</span></div>
+<div className="flex justify-between items-center text-sm font-bold text-white"><span>{selectedMatch.away}</span><span className="font-black text-lg text-indigo-400">{safeSplit(selectedMatch.score)[1]}</span></div>
 <div className="h-[1px] bg-white/10"></div>
 <div className="space-y-3">
 <p className="text-xs font-bold text-white"><i className="fa-solid fa-map-marker-alt text-indigo-400 mr-2"></i> {selectedMatch.location || 'Estadio por confirmar'}</p>
@@ -211,6 +232,8 @@ return (
 </div>
 </div>
 )}
+
+{/* Modal Estadísticas */}
 {showStats && (
 <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6 z-[200] modal-enter-active" onClick={() => setShowStats(false)}>
 <div className="bg-[#0f172a] rounded-[32px] w-full max-w-sm max-h-[90vh] overflow-hidden border border-white/10 shadow-2xl relative" onClick={e => e.stopPropagation()}>
@@ -218,14 +241,11 @@ return (
 <div className="p-6">
 <h2 className="text-lg font-black text-center mb-6">Estadísticas Chile</h2>
 {statsLoading ? (
-<div className="space-y-6">
-{[1,2,3].map(i => <div key={i} className="h-8 bg-slate-800 rounded-2xl loading-shimmer"></div>)}
-</div>
+<div className="space-y-6">{[1,2,3].map(i => <div key={i} className="h-8 bg-slate-800 rounded-2xl loading-shimmer"></div>)}</div>
 ) : statsData && statsData.leagues && statsData.leagues.length > 0 ? statsData.leagues.map((league, idx) => (
 <div key={idx} className="mb-8">
 <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-400 mb-3 flex items-center gap-2">
-<i className="fa-solid fa-trophy"></i>
-{league.name}
+<i className="fa-solid fa-trophy"></i> {league.name}
 </h3>
 <div className="glass rounded-3xl overflow-hidden">
 {league.standings && league.standings.map((team, tIdx) => (
@@ -255,6 +275,7 @@ return (
 </div>
 </div>
 )}
+
 {toast && <div className="fixed bottom-28 left-1/2 -translate-x-1/2 px-5 py-3 glass rounded-xl text-center z-[150] border border-emerald-500/20 bg-emerald-950/80"><p className="text-[10px] font-bold text-emerald-300 uppercase flex items-center gap-2"><i className="fa-solid fa-bell"></i> {toast}</p></div>}
 </div>
 );
