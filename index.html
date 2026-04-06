@@ -62,7 +62,7 @@ const App = () => {
 
     if (cachedData && cachedTime) {
       const age = Date.now() - parseInt(cachedTime);
-      if (age < 10 * 60 * 100) {
+      if (age < 10 * 60 * 1000) {
         const parsed = JSON.parse(cachedData);
         if (isStats) setStatsData(parsed);
         else setData(parsed);
@@ -75,16 +75,35 @@ const App = () => {
 
     // Calcular fechas exactas
     const today = new Date();
-    const todayStr = today.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const options = { day: '2-digit', month: '2-digit', year: 'numeric' }; 
+    
+    const todayStr = today.toLocaleDateString('es-CL', options);
+    
     const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    const tomorrowStr = tomorrow.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    //tomorrow.setDate(today.getDate() + 1);
+    tomorrow.setDate(today.getDate() + 7 + 1); // +7 días + 1 para saltar hoy
 
+    const tomorrowStr = tomorrow.toLocaleDateString('es-CL', options);
+
+    const pasadoStrn= new Date(today);
+    //tomorrow.setDate(today.getDate() + 1);
+    pasadoStrn.setDate(today.getDate() - 7 - 1); // -7 días - 1 para saltar hoy
+
+    const anteStrn = pasadoStrn.toLocaleDateString('es-CL', options);
+
+    const ayerStrn= new Date(today);
+    //tomorrow.setDate(today.getDate() + 1);
+    ayerStrn.setDate(today.getDate() - 1); //  - 1 para saltar hoy
+
+    const ayerSt = ayerStrn.toLocaleDateString('es-CL', options);
+    
     let prompt = "";
     if (isStats) {
       prompt = `JSON ONLY. Estadísticas actuales y ranking de equipos chilenos de fútbol profesional.`;
     } else if (tab === "anteriores") {
-      prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los últimos 7 días (hasta el día de ayer).`;
+      //prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los últimos 7 días (hasta el día de ayer).`;
+      prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los últimos 7 días (desde el día ${anteStrn} hasta el día de ayer ${ayerSt}).`;
+
     } else if (tab === "siguientes") {
       prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE desde mañana (${tomorrowStr}) durante los próximos 7 días.`;
     } else {
