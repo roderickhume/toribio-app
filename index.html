@@ -81,21 +81,21 @@ const App = () => {
     
     const tomorrow = new Date(today);
     //tomorrow.setDate(today.getDate() + 1);
-    tomorrow.setDate(today.getDate() + 7 + 1); // +7 días + 1 para saltar hoy
+    tomorrow.setDate(today.getDate() + 2 + 1); // +7 días + 1 para saltar hoy
 
     const tomorrowStr = tomorrow.toLocaleDateString('es-CL', options);
 
     const pasadoStrn= new Date(today);
     //tomorrow.setDate(today.getDate() + 1);
-    pasadoStrn.setDate(today.getDate() - 7 - 1); // -7 días - 1 para saltar hoy
+    pasadoStrn.setDate(today.getDate() - 2 - 1); // -7 días - 1 para saltar hoy
 
     const anteStrn = pasadoStrn.toLocaleDateString('es-CL', options);
 
-    const ayerStrn= new Date(today);
+    const ayerStrn2= new Date(today);
     //tomorrow.setDate(today.getDate() + 1);
-    ayerStrn.setDate(today.getDate() - 1); //  - 1 para saltar hoy
+    ayerStrn2.setDate(today.getDate() - 1); //  - 1 para saltar hoy
 
-    const ayerSt = ayerStrn.toLocaleDateString('es-CL', options);
+    const ayerSt = ayerStrn2.toLocaleDateString('es-CL', options);
     
     let prompt = "";
     if (isStats) {
