@@ -56,14 +56,13 @@ const App = () => {
   const fetchWithCache = async (tab, isStats = false) => {
     const cacheKey = isStats ? "stats_cache" : `matches_${tab}`;
     const cacheTimeKey = `${cacheKey}_time`;
-    
-    // Verificar caché (válido por 10 minutos)
+
     const cachedData = localStorage.getItem(cacheKey);
     const cachedTime = localStorage.getItem(cacheTimeKey);
-    
+
     if (cachedData && cachedTime) {
       const age = Date.now() - parseInt(cachedTime);
-      if (age < 10 * 60 * 1000) { // 10 minutos
+      if (age < 10 * 60 * 1000) {
         const parsed = JSON.parse(cachedData);
         if (isStats) setStatsData(parsed);
         else setData(parsed);
@@ -88,7 +87,7 @@ const App = () => {
     prompt += ` Categorizar obligatoriamente por división: Primera División, Segunda División y Tercera División. Formato exacto: {"leagues": [{"name": "Primera División", "matches": [{"id": number, "home": "String", "away": "String", "score": "0-0", "time": "15:00", "date": "String", "status": "LIVE|FINAL|SCHEDULED", "location": "String", "city": "String"}]}, ... ]}. Si no hay partidos en una división poner array vacío [].`;
 
     try {
-      const response = await fetch('/api/gemini', {
+      const response = await fetch('/api/groq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,12 +96,10 @@ const App = () => {
         })
       });
 
-      if (response.status === 429) {
-        throw new Error("RATE_LIMIT");
-      }
+      if (response.status === 429) throw new Error("RATE_LIMIT");
 
       const result = await response.json();
-      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const rawText = result.choices?.[0]?.message?.content || "";
       const start = rawText.indexOf('{');
       const end = rawText.lastIndexOf('}');
       const jsonData = start !== -1 ? JSON.parse(rawText.substring(start, end + 1)) : null;
@@ -119,9 +116,9 @@ const App = () => {
       }
     } catch (err) {
       if (err.message === "RATE_LIMIT") {
-        setError("Límite de consultas alcanzado. Espera 10-15 minutos e intenta nuevamente.");
+        setError("Límite de Groq alcanzado. Espera 10-15 minutos e intenta nuevamente.");
       } else {
-        setError("Error de conexión. Verifica tu internet o intenta más tarde.");
+        setError("Error de conexión con Groq. Intenta más tarde.");
       }
     } finally {
       setLoading(false);
@@ -136,31 +133,21 @@ const App = () => {
     if (!statsData) loadStats();
   };
 
-  const resetToToday = () => {
-    setSelectedTab("hoy");
-  };
+  const resetToToday = () => setSelectedTab("hoy");
 
-  useEffect(() => {
-    loadData();
-  }, [selectedTab]);
+  useEffect(() => { loadData(); }, [selectedTab]);
 
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-[#020617] pb-32">
       <header className="p-5 flex justify-between items-center sticky top-0 z-50 glass border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <i className="fa-solid fa-futbol text-white text-lg"></i>
-          </div>
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20"><i className="fa-solid fa-futbol text-white text-lg"></i></div>
           <div>
             <h1 className="text-sm font-black tracking-tighter uppercase leading-none">Toribio <span className="text-indigo-400 font-extrabold">v9.1</span></h1>
-            <p className="text-[9px] font-bold text-emerald-500 tracking-wider mt-1 flex items-center gap-1.5 uppercase">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>En línea - Chile
-            </p>
+            <p className="text-[9px] font-bold text-emerald-500 tracking-wider mt-1 flex items-center gap-1.5 uppercase"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>En línea - Chile (Groq)</p>
           </div>
         </div>
-        <button onClick={loadData} className={`p-2 rounded-full ${loading ? 'animate-spin text-indigo-400' : 'text-slate-400 active:bg-white/10'}`}>
-          <i className="fa-solid fa-rotate-right"></i>
-        </button>
+        <button onClick={loadData} className={`p-2 rounded-full ${loading ? 'animate-spin text-indigo-400' : 'text-slate-400 active:bg-white/10'}`}><i className="fa-solid fa-rotate-right"></i></button>
       </header>
 
       <div className="p-4">
@@ -172,14 +159,12 @@ const App = () => {
       </div>
 
       <main className="px-4 space-y-8">
-        {loading && !data ? (
-          [1,2,3].map(i => (
-            <div key={i} className="space-y-3">
-              <div className="h-3 w-24 bg-slate-800 rounded-full loading-shimmer"></div>
-              <div className="h-32 w-full rounded-[28px] bg-slate-900 loading-shimmer"></div>
-            </div>
-          ))
-        ) : error ? (
+        {loading && !data ? [1,2,3].map(i => (
+          <div key={i} className="space-y-3">
+            <div className="h-3 w-24 bg-slate-800 rounded-full loading-shimmer"></div>
+            <div className="h-32 w-full rounded-[28px] bg-slate-900 loading-shimmer"></div>
+          </div>
+        )) : error ? (
           <div className="text-center py-20 text-slate-400">
             <i className="fa-solid fa-circle-exclamation text-5xl mb-4 text-amber-500"></i>
             <p className="font-bold">{error}</p>
@@ -218,7 +203,7 @@ const App = () => {
               );
             }) : (
               <div className="glass rounded-[28px] p-8 text-center">
-                <p className="text-slate-400 text-sm">No hay partidos programados en esta división para el período seleccionado.</p>
+                <p className="text-slate-400 text-sm">No hay partidos programados en esta división.</p>
               </div>
             )}
           </div>
@@ -238,7 +223,6 @@ const App = () => {
         <i className="fa-solid fa-gear text-lg text-slate-500"></i>
       </nav>
 
-      {/* Modal Partido */}
       {selectedMatch && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6 z-[200] modal-enter-active" onClick={() => setSelectedMatch(null)}>
           <div className="bg-[#0f172a] rounded-[32px] w-full max-w-sm p-8 border border-white/10 shadow-2xl relative" onClick={e => e.stopPropagation()}>
@@ -261,7 +245,6 @@ const App = () => {
         </div>
       )}
 
-      {/* Modal Estadísticas */}
       {showStats && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6 z-[200] modal-enter-active" onClick={() => setShowStats(false)}>
           <div className="bg-[#0f172a] rounded-[32px] w-full max-w-sm max-h-[90vh] overflow-hidden border border-white/10 shadow-2xl relative" onClick={e => e.stopPropagation()}>
@@ -296,7 +279,7 @@ const App = () => {
               )) : (
                 <div className="text-center py-12 text-slate-400">
                   <i className="fa-solid fa-chart-simple text-4xl mb-4"></i>
-                  <p className="font-bold">No hay estadísticas disponibles</p>
+                  <p className="font-bold">No hay estadísticas disponibles en este momento</p>
                 </div>
               )}
             </div>
@@ -304,13 +287,7 @@ const App = () => {
         </div>
       )}
 
-      {toast && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 px-5 py-3 glass rounded-xl text-center z-[150] border border-emerald-500/20 bg-emerald-950/80">
-          <p className="text-[10px] font-bold text-emerald-300 uppercase flex items-center gap-2">
-            <i className="fa-solid fa-bell"></i> {toast}
-          </p>
-        </div>
-      )}
+      {toast && <div className="fixed bottom-28 left-1/2 -translate-x-1/2 px-5 py-3 glass rounded-xl text-center z-[150] border border-emerald-500/20 bg-emerald-950/80"><p className="text-[10px] font-bold text-emerald-300 uppercase flex items-center gap-2"><i className="fa-solid fa-bell"></i> {toast}</p></div>}
     </div>
   );
 };
