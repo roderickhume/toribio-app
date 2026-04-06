@@ -1,5 +1,9 @@
 {
-  "type": "module",
   "name": "toribio-pro",
-  "version": "1.0.0"
+  "version": "9.1.0",
+  "type": "module",
+  "description": "Toribio Pro - Resultados de fútbol Chile con Groq",
+  "scripts": {
+    "dev": "echo 'Este es un proyecto estático + serverless functions'"
+  }
 }
