@@ -81,13 +81,13 @@ const App = () => {
     
     const tomorrow = new Date(today);
     //tomorrow.setDate(today.getDate() + 1);
-    tomorrow.setDate(today.getDate() + 2 + 1); // +7 días + 1 para saltar hoy
+    tomorrow.setDate(today.getDate() + 3 + 1); // +7 días + 1 para saltar hoy
 
     const tomorrowStr = tomorrow.toLocaleDateString('es-CL', options);
 
     const pasadoStrn= new Date(today);
     //tomorrow.setDate(today.getDate() + 1);
-    pasadoStrn.setDate(today.getDate() - 2 - 1); // -7 días - 1 para saltar hoy
+    pasadoStrn.setDate(today.getDate() - 3 - 1); // -7 días - 1 para saltar hoy
 
     const anteStrn = pasadoStrn.toLocaleDateString('es-CL', options);
 
@@ -102,10 +102,10 @@ const App = () => {
       prompt = `JSON ONLY. Estadísticas actuales y ranking de equipos chilenos de fútbol profesional.`;
     } else if (tab === "anteriores") {
       //prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los últimos 7 días (hasta el día de ayer).`;
-      prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los últimos 7 días (desde el día ${anteStrn} hasta el día de ayer ${ayerSt}).`;
+      prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE de los últimos 3 días (desde el día ${anteStrn2} hasta el día de ayer ${ayerSt}).`;
 
     } else if (tab === "siguientes") {
-      prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE desde mañana (${tomorrowStr}) durante los próximos 7 días.`;
+      prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE desde mañana (${tomorrowStr}) durante 3 los próximos  días.`;
     } else {
       prompt = `JSON ONLY. Solo partidos de fútbol profesional en CHILE del día de hoy (${todayStr}).`;
     }
