@@ -62,7 +62,7 @@ const App = () => {
 
     if (cachedData && cachedTime) {
       const age = Date.now() - parseInt(cachedTime);
-      if (age < 10 * 60 * 1000) {
+      if (age < 10 * 60 * 10000) {
         const parsed = JSON.parse(cachedData);
         if (isStats) setStatsData(parsed);
         else setData(parsed);
